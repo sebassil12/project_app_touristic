@@ -1,16 +1,16 @@
-# flutter_application_proyecto
+# Aplicación Guía Turística
 
-A new Flutter project.
+Proyecto de Flutter destinado para almacenar lugares turísticos de Quito, 
+guardar reseñas y ver en el mapa. 
 
 ## Getting Started
 
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
+Algunos recursos para iniciar este proyecto
 
 - [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
 - [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Para ayuda
+[online documentation](https://docs.flutter.dev/)
+
+Correr el comando flutter pub get 
