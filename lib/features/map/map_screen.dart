@@ -5,6 +5,8 @@ import 'package:flutter_application_proyecto/features/map/models/marker_model.da
 import 'package:flutter_application_proyecto/features/map/services/location_service.dart';
 import 'package:flutter_application_proyecto/features/map/services/place_service.dart';
 
+// This is a simple map screen that allows users to search for places, add markers, and view their current location.
+// It uses the Flutter Map package for rendering the map and the Location Service for getting the user's current location.
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
 
@@ -12,14 +14,15 @@ class MapScreen extends StatefulWidget {
   State<MapScreen> createState() => _MapScreenState();
 }
 
+// The state class for the MapScreen widget.
 class _MapScreenState extends State<MapScreen> {
   final MapController _mapController = MapController();
   final LocationService _locationService = LocationService();
   final PlaceService _placeService = PlaceService();
   final TextEditingController _searchController = TextEditingController();
 
-  List<MarkerData> _markersData = [];
-  List<Marker> _markers = [];
+  final List<MarkerData> _markersData = [];
+  final List<Marker> _markers = [];
   LatLng? _currentLocation;
   LatLng? _selectedPosition;
   bool _isDragging = false;
@@ -39,6 +42,7 @@ class _MapScreenState extends State<MapScreen> {
     super.dispose();
   }
 
+  // load
   Future<void> _loadInitialLocation() async {
     try {
       final position = await _locationService.determinePosition();
@@ -259,7 +263,7 @@ class _MapScreenState extends State<MapScreen> {
           TextField(
             controller: _searchController,
             decoration: InputDecoration(
-              hintText: 'Search places...',
+              hintText: 'Buscar Lugares...',
               filled: true,
               fillColor: Colors.white,
               border: OutlineInputBorder(

@@ -161,3 +161,8 @@ app.*.symbols
 .gclient_previous_sync_commits
 
 .metadata
+
+#Credentials
+*.env
+
+node_modules
