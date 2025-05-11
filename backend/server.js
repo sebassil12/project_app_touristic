@@ -14,11 +14,33 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 // Security middleware
 app.use(helmet());
+const allowedOrigins = [
+  'http://localhost:*',       // All localhost ports
+  'http://192.168.18.155:*',  // Your local network IP
+  'https://your-production-domain.com' // Production domain
+];
+
 app.use(cors({
-  origin: process.env.NODE_ENV === 'development' 
-    ? 'http://localhost:8080' 
-    : 'https://flutter-app-domain.com'
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, etc)
+    if (!origin) return callback(null, true);
+    
+    // Check if the origin is in allowedOrigins
+    if (allowedOrigins.some(allowed => origin.match(new RegExp(allowed.replace('*', '.*'))))) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  credentials: true,
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }));
+
+// Explicitly handle OPTIONS requests
+app.options('*', cors());
 
 // Rate limiting
 const limiter = rateLimit({
@@ -72,53 +94,59 @@ app.post('/register',
       body('password')
         .isString()
         .withMessage('Password must be a string')
-        .isLength({ min: 8 })
-        .withMessage('Password must be at least 8 characters')
+        .isLength({ min: 6 }) // Changed from 8 to match Flutter
+        .withMessage('Password must be at least 6 characters'),
+      body('email')
+        .isEmail()
+        .withMessage('Must be a valid email')
+        .normalizeEmail()
     ],
     async (req, res) => {
-      // Log the incoming request body for debugging
-      console.log('Request body:', req.body);
+      console.log('Full request body:', req.body);
       
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        console.log('Validation errors:', errors.array());
-        return res.status(400).json({ errors: errors.array() });
+        return res.status(400).json({ 
+          success: false,
+          message: 'Validation failed',
+          errors: errors.array() 
+        });
       }
   
-      const { username, password } = req.body;
-      console.log('Extracted values:', { username, password });
-  
+      const { username, password, email } = req.body;
+
       try {
         const hashedPassword = await bcrypt.hash(password, 10);
-        console.log('Password hashed successfully');
-  
         const result = await pool.query(
-          'INSERT INTO gis_schema.users (username, password) VALUES ($1, $2) RETURNING id, username',
-          [username, hashedPassword]
+          'INSERT INTO gis_schema.users (username, password, email) VALUES ($1, $2, $3) RETURNING id, username, email',
+          [username, hashedPassword, email]
         );
         
-        console.log('User created:', result.rows[0]);
         res.status(201).json({ 
           success: true,
-          user: result.rows[0] 
+          user: result.rows[0],
+          message: 'Registration successful'
         });
       } catch (err) {
-        console.error('Database error:', err);
-        
-        // Handle duplicate username error
-        if (err.code === '23505') { // PostgreSQL unique violation
-          return res.status(400).json({ 
-            error: 'Username already exists' 
+        if (err.code === '23505') {
+          const detail = err.detail.includes('email') 
+            ? 'Email already exists' 
+            : 'Username already exists';
+          
+          return res.status(400).json({
+            success: false,
+            message: detail
           });
         }
         
         res.status(500).json({ 
-          error: 'Internal server error',
-          details: process.env.NODE_ENV === 'development' ? err.message : undefined
+          success: false,
+          message: 'Internal server error',
+          error: process.env.NODE_ENV === 'development' ? err.message : undefined
         });
       }
     }
-  );
+);
 
 // User login
 app.post('/login', async (req, res) => {
@@ -152,7 +180,146 @@ app.post('/login', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+// Obtener usuario actual
+app.get('/users/me', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, username, email FROM gis_schema.users WHERE id = $1',
+      [req.user.userId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
+// Actualizar usuario actual
+app.put('/users/me', authenticateToken, 
+  [
+    body('username').optional().isLength({ min: 3 }),
+    body('email').optional().isEmail(),
+    body('newPassword').optional().isLength({ min: 6 })
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { username, email, newPassword } = req.body;
+
+    try {
+      let query = 'UPDATE gis_schema.users SET';
+      const values = [];
+      let paramCount = 1;
+
+      if (username) {
+        query += ` username = $${paramCount++},`;
+        values.push(username);
+      }
+      if (email) {
+        query += ` email = $${paramCount++},`;
+        values.push(email);
+      }
+      if (newPassword) {
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        query += ` password = $${paramCount++},`;
+        values.push(hashedPassword);
+      }
+
+      query = query.slice(0, -1) + ` WHERE id = $${paramCount} RETURNING id, username, email`;
+      values.push(req.user.userId);
+
+      const result = await pool.query(query, values);
+      
+      res.json({ 
+        success: true,
+        user: result.rows[0]
+      });
+    } catch (err) {
+      if (err.code === '23505') {
+        return res.status(400).json({ error: 'Username or email already exists' });
+      }
+      res.status(500).json({ error: err.message });
+    }
+  }
+);
+
+// Eliminar usuario actual
+app.delete('/users/me', authenticateToken, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM gis_schema.users WHERE id = $1', [req.user.userId]);
+    res.status(204).send();
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+app.put('/users/:id', authenticateToken, 
+  [
+    body('username').optional().isLength({ min: 3 }),
+    body('email').optional().isEmail(),
+    body('newPassword').optional().isLength({ min: 6 })
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { id } = req.params;
+    const { username, email, newPassword } = req.body;
+
+    try {
+      let query = 'UPDATE gis_schema.users SET';
+      const values = [];
+      let paramCount = 1;
+
+      if (username) {
+        query += ` username = $${paramCount++},`;
+        values.push(username);
+      }
+      if (email) {
+        query += ` email = $${paramCount++},`;
+        values.push(email);
+      }
+      if (newPassword) {
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        query += ` password = $${paramCount++},`;
+        values.push(hashedPassword);
+      }
+
+      query = query.slice(0, -1) + ` WHERE id = $${paramCount} RETURNING id, username, email`;
+      values.push(id);
+
+      const result = await pool.query(query, values);
+      
+      res.json({ 
+        success: true,
+        user: result.rows[0]
+      });
+    } catch (err) {
+      if (err.code === '23505') {
+        return res.status(400).json({ error: 'Username or email already exists' });
+      }
+      res.status(500).json({ error: err.message });
+    }
+  }
+);
+
+// Eliminar usuario
+app.delete('/users/:id', authenticateToken, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM gis_schema.users WHERE id = $1', [req.params.id]);
+    res.status(204).send();
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 // Protected marker endpoints
 app.get('/api/markers', authenticateToken, async (req, res) => {
   try {
@@ -200,7 +367,7 @@ app.post('/api/markers', authenticateToken,
 );
 
 const PORT = process.env.API_PORT || 3000;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV}`);
   console.log(`Database host: ${process.env.DB_HOST}`);

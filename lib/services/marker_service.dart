@@ -1,44 +1,21 @@
 import 'dart:convert';
+import 'package:flutter_application_proyecto/services/config_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'auth_service.dart';
 
 class MarkerService {
-  static const String _baseUrl = 'http://localhost:3000';
-  final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
-  Future<String?> _getToken() async {
-    return await _storage.read(key: 'auth_token');
-  }
+  final AuthService _authService;
 
-  Future<void> _saveToken(String token) async {
-    await _storage.write(key: 'auth_token', value: token);
-  }
-
-  Future<void> login(String username, String password) async {
-    final response = await http.post(
-      Uri.parse('$_baseUrl/login'),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({
-        'username': username,
-        'password': password,
-      }),
-    );
-
-    if (response.statusCode == 200) {
-      final token = json.decode(response.body)['token'];
-      await _saveToken(token);
-    } else {
-      throw Exception('Failed to login');
-    }
-  }
+  MarkerService(this._authService);
 
   Future<List<Map<String, dynamic>>> getMarkers() async {
-    final token = await _getToken();
+    final token = await _authService.getToken();
     if (token == null) throw Exception('Not authenticated');
 
     final response = await http.get(
-      Uri.parse('$_baseUrl/api/markers'),
+      Uri.parse('${AppConfig.baseUrl}/api/markers'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
@@ -57,11 +34,11 @@ class MarkerService {
     required String description,
     required LatLng position,
   }) async {
-    final token = await _getToken();
+    final token = await _authService.getToken();
     if (token == null) throw Exception('Not authenticated');
 
     final response = await http.post(
-      Uri.parse('$_baseUrl/api/markers'),
+      Uri.parse('${AppConfig.baseUrl}/api/markers'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
@@ -78,6 +55,23 @@ class MarkerService {
       return json.decode(response.body);
     } else {
       throw Exception('Failed to add marker');
+    }
+  }
+
+  Future<void> deleteMarker(String markerId) async {
+    final token = await _authService.getToken();
+    if (token == null) throw Exception('Not authenticated');
+
+    final response = await http.delete(
+      Uri.parse('${AppConfig.baseUrl}/api/markers/$markerId'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode != 204) {
+      throw Exception('Failed to delete marker');
     }
   }
 }

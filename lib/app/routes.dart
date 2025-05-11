@@ -6,6 +6,7 @@ import 'package:flutter_application_proyecto/features/poi/poi_list_screen.dart';
 import 'package:flutter_application_proyecto/features/poi/poi_detail_screen.dart';
 import 'package:flutter_application_proyecto/features/poi/review_screen.dart';
 import 'package:flutter_application_proyecto/features/profile/profile_screen.dart';
+import 'package:flutter_application_proyecto/features/register/register_screen.dart';
 
 final Map<String, WidgetBuilder> appRoutes = {
   '/auth': (context) => const AuthScreen(),
@@ -15,4 +16,5 @@ final Map<String, WidgetBuilder> appRoutes = {
   '/poi-detail': (context) => const POIDetailScreenWrapper(),
   '/review': (context) => const ReviewScreenWrapper(),
   '/profile': (context) => const ProfileScreen(),
+  '/register': (context) => const RegisterPage(),
 };
