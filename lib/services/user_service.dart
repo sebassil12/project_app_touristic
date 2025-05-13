@@ -17,12 +17,9 @@ Future<Map<String, dynamic>> createUser({
   required String password,
   required String email,
 }) async {
-  const url = 'http://192.168.18.155:3000/register';
-  debugPrint('Sending from origin: http://localhost:52243');
-
   try {
     final response = await http.post(
-      Uri.parse(url),
+      Uri.parse('${AppConfig.baseUrl}/register'),
       headers: {
         'Content-Type': 'application/json',
         'Origin': 'http://localhost:52243', // MUST match exactly
@@ -33,8 +30,6 @@ Future<Map<String, dynamic>> createUser({
         'email': email,
       }),
     );
-
-    debugPrint('Response headers:');
     response.headers.forEach((k,v) => debugPrint('$k: $v'));
 
     if (response.statusCode == 201) {
@@ -42,7 +37,6 @@ Future<Map<String, dynamic>> createUser({
     }
     throw Exception('Failed with status ${response.statusCode}');
   } catch (e) {
-    debugPrint('FULL ERROR: $e');
     throw Exception('Registration failed. Please try again.');
   }
 }
