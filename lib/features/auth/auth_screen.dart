@@ -33,7 +33,7 @@ class _AuthScreenState extends State<AuthScreen> {
       }
     } catch (e) {
       setState(() {
-        _errorMessage = 'Login failed. Please check your credentials.';
+        _errorMessage = 'Falla en login. Porfavror verifica tus credenciales.';
       });
     } finally {
       if (mounted) {
@@ -102,7 +102,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 const SizedBox(height: 20),
                 TextButton(
                   onPressed: _navigateToRegister,
-                  child: const Text("Don't have an account? Register"),
+                  child: const Text("No tienes cuenta? Registrate"),
                 ),
               ],
             ),
