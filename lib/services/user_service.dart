@@ -22,7 +22,6 @@ Future<Map<String, dynamic>> createUser({
       Uri.parse('${AppConfig.baseUrl}/register'),
       headers: {
         'Content-Type': 'application/json',
-        'Origin': 'http://localhost:52243', // MUST match exactly
       },
       body: json.encode({
         'username': username,
@@ -30,14 +29,13 @@ Future<Map<String, dynamic>> createUser({
         'email': email,
       }),
     );
-    response.headers.forEach((k,v) => debugPrint('$k: $v'));
 
     if (response.statusCode == 201) {
       return json.decode(response.body);
     }
     throw Exception('Failed with status ${response.statusCode}');
   } catch (e) {
-    throw Exception('Registration failed. Please try again.');
+    throw Exception('Registration failed. Please try again. ${e.toString()}');
   }
 }
 
